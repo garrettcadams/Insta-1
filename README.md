@@ -1,4 +1,4 @@
 # For Sale
 
-$50 -> compiled version
-$250 -> source code
+$20 -> compiled version
+$80 -> source code

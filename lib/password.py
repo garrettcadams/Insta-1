@@ -84,10 +84,10 @@ class Password:
             for line in f:
 
                 if self.resume:
-                    if attempts < self.attempts + self.size() + 1:
+                    if attempts < self.attempts + self.size():
                         attempts += 1
                         continue
-                    else:
+                    elif self.resume:
                         self.resume = False
 
                 while self.size() >= self.max_passwords:

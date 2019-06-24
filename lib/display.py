@@ -180,10 +180,6 @@ class Display:
             progress,
         )
 
-        # msg = '[-] Username: {}  ::  Attempts: {}  ::  Browsers: {}  ::  Progress: {}%'.format(
-        #     username, attempts
-        # )
-
         print(msg, end='\r')
 
     def password_found(self, password: str) -> None:

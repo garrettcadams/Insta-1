@@ -66,6 +66,7 @@ class Browser:
                 headers=headers,
                 proxies=self.proxy,
                 url=const.LOGIN_URL,
+                timeout=const.MAX_ATTEMPT_TIME
             )
 
             self.parse_resp(resp.json())
