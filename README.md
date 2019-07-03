@@ -16,6 +16,14 @@ pip3 install -r requirements.txt
 
 ### Usage
 
+Give permission to program
+
+```
+chmod +x instagram.py
+```
+
+Run the code
+
 ```
 python3 instagram.py
 ```

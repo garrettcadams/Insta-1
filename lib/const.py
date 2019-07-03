@@ -1,10 +1,12 @@
+import os
+
 # Info
 AUTHOR = 'Pure-L0G1C'
 VERSION = 'v3.0.0'
 
 
 # Database
-DB_PATH = 'sessions.db'
+DB_PATH = os.path.abspath('sessions.db')
 
 
 # Login

@@ -79,7 +79,7 @@ class Password:
 
         attempts = 0  # for resuming
 
-        with open(self.wordlist, 'rt') as f:
+        with open(self.wordlist, 'rt', encoding='utf-8') as f:
 
             for line in f:
 
