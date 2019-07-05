@@ -6,6 +6,7 @@ import time
 import typing
 import hashlib
 import requests
+from sys import exit 
 from queue import Queue
 from collections import deque
 from threading import Thread, RLock

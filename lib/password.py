@@ -4,6 +4,7 @@
 
 import os
 import time
+from sys import exit
 from hashlib import sha256
 from collections import deque
 from lib.session import Session
