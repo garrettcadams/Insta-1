@@ -39,7 +39,8 @@ class Proxies:
         try:
             resp = session.get(
                 URL,
-                headers={'accept-language': 'en-US,en;q=0.9'}
+                headers={'accept-language': 'en-US,en;q=0.9',
+                         'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_3_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Mobile/13F69 Instagram 8.4.0 (iPhone7,2; iPhone OS 9_3_2; nb_NO; nb-NO; scale=2.00; 750x1334'}
             )
         except:
             return

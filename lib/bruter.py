@@ -6,7 +6,7 @@ import time
 import typing
 import hashlib
 import requests
-from sys import exit 
+from sys import exit
 from queue import Queue
 from collections import deque
 from threading import Thread, RLock
@@ -87,7 +87,9 @@ class Bruter:
 
         try:
             csrftoken = requests.get(
-                const.CSRFTOKEN_URL
+                const.CSRFTOKEN_URL,
+                headers={
+                    'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_3_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Mobile/13F69 Instagram 8.4.0 (iPhone7,2; iPhone OS 9_3_2; nb_NO; nb-NO; scale=2.00; 750x1334'}
             ).cookies.get_dict()['csrftoken']
 
         except:

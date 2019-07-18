@@ -1,0 +1,5 @@
+bs4
+PySocks
+colorama
+requests
+requests-html
